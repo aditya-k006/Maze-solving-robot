@@ -1,0 +1,76 @@
+;
+; uart_rx.pio  —  8N1 UART receiver implemented in PIO.
+;
+; Used for the third TFMini sensor (Right) because the RP2040
+; only has two hardware UARTs and both are taken by Front/Left.
+;
+; IN pin 0 and JMP pin must both be mapped to the RX GPIO.
+; Timing: 8 PIO cycles per bit → clkdiv = sys_clock / (8 * baud)
+;
+
+.program uart_rx
+
+start:
+    wait 0 pin 0        ; stall until start-bit (falling edge)
+    set x, 7    [10]    ; load bit counter = 7, then delay to mid-bit 0
+                        ; (12 cycles from falling edge ≈ 1.5 bit periods)
+bitloop:
+    in pins, 1          ; sample one bit into ISR (LSB first)
+    jmp x-- bitloop [6] ; repeat 8 times; each iteration = 8 cycles
+    push noblock        ; push 8-bit word to RX FIFO (drop if full)
+    jmp start
+
+% c-sdk {
+#include "hardware/clocks.h"
+
+// Call once to start the state machine on 'pio' (pio0 or pio1).
+static inline void uart_rx_program_init(PIO pio, uint sm, uint offset,
+                                         uint pin, uint baud)
+{
+    // Configure pin as input with pull-up (UART idles high)
+    pio_sm_set_consecutive_pindirs(pio, sm, pin, 1, false);
+    pio_gpio_init(pio, pin);
+    gpio_pull_up(pin);
+
+    pio_sm_config c = uart_rx_program_get_default_config(offset);
+    sm_config_set_in_pins(&c, pin);       // WAIT and IN use this pin
+    sm_config_set_jmp_pin(&c, pin);       // JMP pin (not used here but set for safety)
+
+    // Shift right (LSB first, matching UART bit order), no autopush,
+    // threshold 32 so we push manually after each byte.
+    sm_config_set_in_shift(&c, true, false, 32);
+
+    // Join RX FIFOs for deeper buffering (8 entries instead of 4)
+    sm_config_set_fifo_join(&c, PIO_FIFO_JOIN_RX);
+
+    // Clock divider: 8 PIO cycles per UART bit
+    float div = (float)clock_get_hz(clk_sys) / (8.0f * baud);
+    sm_config_set_clkdiv(&c, div);
+
+    pio_sm_init(pio, sm, offset, &c);
+    pio_sm_set_enabled(pio, sm, true);
+}
+
+// Read one byte from the PIO RX FIFO (blocking).
+// Data is left-justified in the 32-bit word (shifted right → MSByte).
+static inline uint8_t uart_rx_program_getc(PIO pio, uint sm)
+{
+    // Wait until at least one word is in the FIFO
+    while (pio_sm_is_rx_fifo_empty(pio, sm))
+        tight_loop_contents();
+
+    // Read the MSByte — that is where the 8 data bits land after right-shifting
+    io_rw_8 *fifo_byte = (io_rw_8 *)&pio->rxf[sm] + 3;
+    return (uint8_t)*fifo_byte;
+}
+
+// Non-blocking version — returns false if FIFO is empty.
+static inline bool uart_rx_program_try_getc(PIO pio, uint sm, uint8_t *out)
+{
+    if (pio_sm_is_rx_fifo_empty(pio, sm))
+        return false;
+    io_rw_8 *fifo_byte = (io_rw_8 *)&pio->rxf[sm] + 3;
+    *out = (uint8_t)*fifo_byte;
+    return true;
+}
+%}
