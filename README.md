@@ -9,13 +9,13 @@ A maze-solving robot built on the Raspberry Pi Pico using a flood-fill algorithm
 | Component | Quantity | Notes |
 |---|---|---|
 | Raspberry Pi Pico / Pico W | 1 | Main microcontroller |
-| N20 micro metal gear motor | 4 | Any gear ratio 100–300 RPM at 12V |
-| Mecanum wheel (48mm) | 4 | X-configuration (2× left-hand, 2× right-hand) |
+| N20 micro metal gear motor | 4 | 300 RPM |
+| Mecanum wheel (48mm) | 4 |  (2× left-hand, 2× right-hand) |
 | L298N dual H-bridge | 2 | One per side (left/right) |
 | TFMini LiDAR (or TFMini-S) | 3 | Front, Left, Right |
 | MPU6050 IMU | 1 | I2C |
 | 12V 2000 mAh LiPo/Li-ion battery | 1 | Powers motors |
-| 5V regulator (e.g. LM7805 or buck) | 1 | Powers Pico + sensors |
+| 5V regulator  | 1 | Powers Pico + sensors |
 | Power switch | 1 | Main on/off |
 
 > **TFMini note:** The standard TFMini has a minimum range of **30 cm**. For cell sizes smaller than ~25 cm, use the **TFMini-S** (minimum range 10 cm) for reliable side-wall detection.
