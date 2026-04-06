@@ -1,4 +1,4 @@
-# Mecanum Maze Robot
+# Maze Solving Robot
 
 A maze-solving robot built on the Raspberry Pi Pico using a flood-fill algorithm, mecanum wheels, TFMini LiDAR sensors for wall detection, and an MPU6050 IMU for heading control.
 
